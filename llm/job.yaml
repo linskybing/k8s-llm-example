@@ -1,0 +1,36 @@
+# LLM server (vLLM, OpenAI API on port 8000). Settings: llm/llama-3.2-1b-n150.json via configmap llm-spec (see README).
+#   kubectl create configmap llm-spec --from-file=spec.json=k8s-n150-example/llm/llama-3.2-1b-n150.json --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl replace --force -f k8s-n150-example/llm/job.yaml  submit / resubmit
+#   kubectl get pods                                          READY 1/1 after ~3 min
+#   kubectl port-forward job/llm-exp 8000:8000 &
+#   python3 k8s-n150-example/llm/chat.py "Hi"
+#   kubectl delete job llm-exp                                release the n150 when done
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: llm-exp
+  labels:
+    n150/home: "false"                 # no home mount: the vLLM image runs as its own user
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      resourceClaims:
+        - {name: n150, resourceClaimTemplateName: n150}
+      containers:
+        - name: vllm
+          image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.11.1-84b4c53-222ee06
+          args: ["--tt-device", "n150", "--no-auth"]
+          env:
+            - name: RUNTIME_MODEL_SPEC_JSON_PATH # model, context length, batch size: configmap llm-spec
+              value: /spec/spec.json
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token, key: token}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+          volumeMounts:
+            - {name: spec, mountPath: /spec}
+      volumes:
+        - name: spec                   # your llm/llama-3.2-1b-n150.json, loaded with kubectl create configmap (see top)
+          configMap: {name: llm-spec}

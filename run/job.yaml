@@ -1,0 +1,17 @@
+# Run a script on the n150. Runs as you, in your home: same files as over SSH.
+#   kubectl replace --force -f k8s-n150-example/run/job.yaml  submit / resubmit
+#   kubectl logs -f job/n150-job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: n150-job
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      resourceClaims:                  # ask for the n150; remove for a CPU-only job (no wait for the card)
+        - {name: n150, resourceClaimTemplateName: n150}
+      containers:
+        - name: app
+          image: ghcr.io/tenstorrent/tt-metal/tt-metalium-ubuntu-22.04-release-amd64:v0.79.0
+          command: [python3, k8s-n150-example/run/matmul.py]
