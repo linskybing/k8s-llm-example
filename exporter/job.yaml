@@ -1,0 +1,23 @@
+# Your own exporter (exporter.py, from your home) on :9400/metrics. No card claim: starts right away, never holds a card.
+#   kubectl replace --force -f k8s-llm-example/exporter/job.yaml
+#   kubectl apply -f k8s-llm-example/exporter/podmonitor.yaml    Prometheus scrapes it (and LLM servers) every 15s
+#   kubectl delete job exporter
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: exporter
+spec:
+  template:
+    metadata:
+      labels:
+        n150/metrics: "true"           # picked up by podmonitor.yaml
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: exporter
+          image: python:3.12-slim
+          command: [python3, k8s-llm-example/exporter/exporter.py]
+          ports:
+            - {name: metrics, containerPort: 9400}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}

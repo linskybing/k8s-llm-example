@@ -1,11 +1,11 @@
 # Interactive shell with the n150 (like srun --pty bash). Holds the card until you delete it.
-#   kubectl replace --force -f k8s-n150-example/shell/job.yaml
-#   kubectl exec -it job/shell -- bash
-#   kubectl delete job shell
+#   kubectl replace --force -f k8s-llm-example/n150/shell.yaml
+#   kubectl exec -it job/n150-shell -- bash
+#   kubectl delete job n150-shell
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: shell
+  name: n150-shell
 spec:
   template:
     spec:

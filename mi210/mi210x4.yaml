@@ -1,0 +1,14 @@
+# Your own claim template: 4 MI210s in one Job. kubectl apply -f k8s-llm-example/mi210/mi210x4.yaml
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: mi210x4
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          exactly:
+            deviceClassName: gpu.amd.com
+            allocationMode: ExactCount
+            count: 4

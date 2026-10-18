@@ -1,0 +1,12 @@
+# Prometheus scrapes port "metrics" of every pod labelled n150/metrics: "true" in this namespace (exporter, LLM servers).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: n150-metrics
+spec:
+  selector:
+    matchLabels:
+      n150/metrics: "true"
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 15s

@@ -1,5 +1,5 @@
-# Ask the LLM from llm/job.yaml (first: kubectl port-forward job/llm-exp 8000:8000 &)
-#   python3 k8s-n150-example/llm/chat.py "Hi"
+# Ask any LLM server here on port 8000 (first: kubectl port-forward job/<job> 8000:8000 &)
+#   python3 k8s-llm-example/chat.py "Hi"
 import sys
 
 from openai import OpenAI

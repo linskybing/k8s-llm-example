@@ -1,14 +1,14 @@
-# LLM server (vLLM, OpenAI API on port 8000). Settings: llm/llama-3.2-1b-n150.json via configmap llm-spec (see README).
-#   kubectl create configmap llm-spec --from-file=spec.json=k8s-n150-example/llm/llama-3.2-1b-n150.json --dry-run=client -o yaml | kubectl apply -f -
-#   kubectl replace --force -f k8s-n150-example/llm/job.yaml  submit / resubmit
+# LLM server (vLLM, OpenAI API on port 8000). Settings: n150/llama-3.2-1b-n150.json via configmap llm-spec (see README).
+#   kubectl create configmap llm-spec --from-file=spec.json=k8s-llm-example/n150/llama-3.2-1b-n150.json --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl replace --force -f k8s-llm-example/n150/llm.yaml  submit / resubmit
 #   kubectl get pods                                          READY 1/1 after ~3 min
-#   kubectl port-forward job/llm-exp 8000:8000 &
-#   python3 k8s-n150-example/llm/chat.py "Hi"
-#   kubectl delete job llm-exp                                release the n150 when done
+#   kubectl port-forward job/n150-llm 8000:8000 &
+#   python3 k8s-llm-example/chat.py "Hi"
+#   kubectl delete job n150-llm                                release the n150 when done
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: llm-exp
+  name: n150-llm
   labels:
     n150/home: "false"                 # no home mount: the vLLM image runs as its own user
 spec:
@@ -32,5 +32,5 @@ spec:
           volumeMounts:
             - {name: spec, mountPath: /spec}
       volumes:
-        - name: spec                   # your llm/llama-3.2-1b-n150.json, loaded with kubectl create configmap (see top)
+        - name: spec                   # your n150/llama-3.2-1b-n150.json, loaded with kubectl create configmap (see top)
           configMap: {name: llm-spec}

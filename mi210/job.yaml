@@ -1,0 +1,20 @@
+# Run a script on MI210s. Runs as you, in your home: same files as over SSH.
+#   kubectl replace --force -f k8s-llm-example/mi210/job.yaml  submit / resubmit
+#   kubectl logs -f job/mi210-job
+# 4 GPUs: kubectl apply -f k8s-llm-example/mi210/mi210x4.yaml, then resourceClaimTemplateName: mi210x4
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mi210-job
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      resourceClaims:                  # ask for one MI210 (template made by the admin)
+        - {name: gpu, resourceClaimTemplateName: mi210}
+      containers:
+        - name: app
+          image: rocm/pytorch:rocm10.1.0_ubuntu24.04_py3.12_pytorch_release_2.14.0
+          command: [python3, k8s-llm-example/mi210/matmul.py]
+          resources:
+            claims: [{name: gpu}]

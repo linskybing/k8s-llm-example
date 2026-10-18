@@ -1,0 +1,54 @@
+# Your own SGLang (~/tt-sglang at v0.5.8.post1) on the n150 via Tenstorrent's tt-sglang-plugin (experimental), OpenAI API on port 8000.
+# Runs in the TT vLLM image (tt-metal + ttnn already there); SGLang and the plugin come from your home. See n150/README.md.
+#   kubectl replace --force -f k8s-llm-example/n150/sglang-custom.yaml
+#   kubectl port-forward job/n150-sglang-custom 8000:8000 &   then python3 k8s-llm-example/chat.py "Hi"
+#   kubectl delete job n150-sglang-custom
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: n150-sglang-custom
+spec:
+  template:
+    metadata:
+      labels:
+        n150/metrics: "true"           # exporter/podmonitor.yaml scrapes /metrics
+    spec:
+      restartPolicy: Never
+      resourceClaims:
+        - {name: n150, resourceClaimTemplateName: n150}
+      containers:
+        - name: sglang
+          image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.11.1-84b4c53-222ee06
+          command: [bash, -c]
+          args:
+            - |
+              set -e
+              # runs as you, not the image user: USER because your uid isn't in the image's /etc/passwd (torch calls
+              # getpass.getuser()); tt-metal logs + kernel cache go to your home
+              export USER=${HOME##*/} TT_METAL_LOGS_PATH=$HOME/tt-cache/logs
+              mkdir -p $TT_METAL_LOGS_PATH
+              source $PYTHON_ENV_DIR/bin/activate
+              # first run (~1 min): build SGLang's CPU kernels (sgl-kernel) against the image's torch, + torchao, into ~/venvs/sglang-tt
+              [ -e ~/venvs/sglang-tt/sgl_kernel ] || (pip install -q --target ~/venvs/sglang-tt-build scikit-build-core cmake ninja \
+                && cd ~/tt-sglang/sgl-kernel && cp pyproject_cpu.toml pyproject.toml \
+                && PATH=~/venvs/sglang-tt-build/bin:$PATH PYTHONPATH=~/venvs/sglang-tt-build:$PYTHONPATH MAX_JOBS=8 \
+                   pip install -q --no-build-isolation --no-deps --target ~/venvs/sglang-tt . torchao==0.9.0)
+              export PYTHONPATH=$HOME/tt-sglang/python:$HOME/tt-inference-server/tt-sglang-plugin:$HOME/venvs/sglang-tt:$PYTHONPATH
+              # the image's tt-metal (84b4c53) calls Generator.decode_forward_text, renamed decode_forward (fixed upstream later);
+              # alias it, then start the plugin's server (it forks, so SGLang's workers keep the alias)
+              exec python -c 'import sys
+              from models.tt_transformers.tt.generator import Generator
+              Generator.decode_forward_text = Generator.decode_forward
+              from sglang_tt_plugin.scripts.launch_tt_server import main
+              main()' --model-path meta-llama/Llama-3.2-1B-Instruct --port 8000 --context-length 8192 --enable-metrics
+          env:
+            - name: TORCHDYNAMO_DISABLE      # no torch.compile on the CPU side (the image's triton can't), as the TT vLLM spec does
+              value: "1"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token, key: token}
+          ports:
+            - {name: metrics, containerPort: 8000}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            timeoutSeconds: 5          # SGLang's /health runs a 1-token generation (~1 s on the n150)

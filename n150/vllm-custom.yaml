@@ -1,0 +1,47 @@
+# Your own Tenstorrent vLLM fork (~/tt-vllm) on the n150, OpenAI API on port 8000. See n150/README.md.
+# Same image and settings (configmap llm-spec) as n150/llm.yaml; only the vllm package comes from your home.
+#   kubectl replace --force -f k8s-llm-example/n150/vllm-custom.yaml
+#   kubectl port-forward job/n150-vllm-custom 8000:8000 &   then python3 k8s-llm-example/chat.py "Hi"
+#   kubectl delete job n150-vllm-custom
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: n150-vllm-custom
+spec:
+  template:
+    metadata:
+      labels:
+        n150/metrics: "true"           # exporter/podmonitor.yaml scrapes /metrics
+    spec:
+      restartPolicy: Never
+      resourceClaims:
+        - {name: n150, resourceClaimTemplateName: n150}
+      containers:
+        - name: vllm
+          image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.11.1-84b4c53-222ee06
+          command: [bash, -c]
+          args:
+            - |
+              set -e
+              # runs as you, not the image user: weights + kernel cache go to your home (kept between runs);
+              # USER because your uid isn't in the image's /etc/passwd (torch calls getpass.getuser())
+              export USER=${HOME##*/} CACHE_ROOT=$HOME/tt-cache TT_METAL_LOGS_PATH=$HOME/tt-cache/logs PYTHONPATH=$HOME/tt-vllm:$PYTHONPATH
+              mkdir -p $TT_METAL_LOGS_PATH
+              source $PYTHON_ENV_DIR/bin/activate
+              cd /home/container_app_user/app/src
+              exec python run_vllm_api_server.py --tt-device n150 --no-auth
+          env:
+            - name: RUNTIME_MODEL_SPEC_JSON_PATH
+              value: /spec/spec.json
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token, key: token}
+          ports:
+            - {name: metrics, containerPort: 8000}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+          volumeMounts:
+            - {name: spec, mountPath: /spec}
+      volumes:
+        - name: spec
+          configMap: {name: llm-spec}
