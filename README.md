@@ -30,7 +30,7 @@ Run it again to change the token. Missing secret = LLM pod stuck in `CreateConta
 ## Queue and metrics
 One queue for both cards: a Job waits only for the cards it asks for.
 ```bash
-kubectl get cq default -o jsonpath='{range .status.flavorsUsage[0].resources[*]}{.name}={.total} {end}'   # cards in use (0 = free): gpu = MI210 of 4, chip = n150 of 1
+kubectl get cq default -o jsonpath='{range .status.flavorsUsage[0].resources[*]}{.name} {.total}{"\n"}{end}' | awk '/chip/{print "n150 free:", 1-$2} /gpu/{print "MI210 free:", 4-$2}'
 kubectl get workloads            # ADMITTED=True: your Job got its card
 kubectl get --raw /apis/visibility.kueue.x-k8s.io/v1beta2/clusterqueues/default/pendingworkloads   # everyone waiting
 kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 &   # Prometheus at http://127.0.0.1:9090
