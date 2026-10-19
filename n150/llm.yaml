@@ -9,8 +9,6 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: n150-llm
-  labels:
-    n150/home: "false"                 # no home mount: the vLLM image runs as its own user
 spec:
   template:
     spec:

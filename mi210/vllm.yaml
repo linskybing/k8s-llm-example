@@ -18,17 +18,21 @@ spec:
       containers:
         - name: vllm
           image: vllm/vllm-openai-rocm:v0.32.0
+          workingDir: /home/<you>        # your home, mounted below (hostPath): same files as over SSH
           command: [vllm, serve, meta-llama/Llama-3.2-1B-Instruct, --port, "8000", --tensor-parallel-size, "1"]
           env:
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef: {name: hf-token, key: token}
+            - {name: HOME, value: /home/<you>}
           readinessProbe:
             httpGet: {path: /health, port: 8000}
           resources:
             claims: [{name: gpu}]
           volumeMounts:
             - {name: shm, mountPath: /dev/shm}   # tensor parallel workers talk over shared memory
+            - {name: home, mountPath: /home/<you>}
       volumes:
         - name: shm
           emptyDir: {medium: Memory, sizeLimit: 16Gi}
+        - {name: home, hostPath: {path: /home/<you>, type: Directory}}

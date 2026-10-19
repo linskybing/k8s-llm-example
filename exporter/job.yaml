@@ -16,8 +16,15 @@ spec:
       containers:
         - name: exporter
           image: python:3.12-slim
+          workingDir: /home/<you>        # your home, mounted below (hostPath): same files as over SSH
           command: [python3, k8s-llm-example/exporter/exporter.py]
           ports:
             - {name: metrics, containerPort: 9400}
           resources:
             requests: {cpu: 50m, memory: 64Mi}
+          env:
+            - {name: HOME, value: /home/<you>}
+          volumeMounts:
+            - {name: home, mountPath: /home/<you>}
+      volumes:
+        - {name: home, hostPath: {path: /home/<you>, type: Directory}}

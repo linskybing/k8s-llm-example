@@ -1,4 +1,4 @@
-# Run a script on MI210s. Runs as you, in your home: same files as over SSH.
+# Run a script on MI210s, from your home.
 #   kubectl replace --force -f k8s-llm-example/mi210/job.yaml  submit / resubmit
 #   kubectl logs -f job/mi210-job
 # 4 GPUs: kubectl apply -f k8s-llm-example/mi210/mi210x4.yaml, then resourceClaimTemplateName: mi210x4
@@ -15,6 +15,13 @@ spec:
       containers:
         - name: app
           image: rocm/pytorch:rocm10.1.0_ubuntu24.04_py3.12_pytorch_release_2.14.0
+          workingDir: /home/<you>        # your home, mounted below (hostPath): same files as over SSH
           command: [python3, k8s-llm-example/mi210/matmul.py]
           resources:
             claims: [{name: gpu}]
+          env:
+            - {name: HOME, value: /home/<you>}
+          volumeMounts:
+            - {name: home, mountPath: /home/<you>}
+      volumes:
+        - {name: home, hostPath: {path: /home/<you>, type: Directory}}

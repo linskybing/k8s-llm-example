@@ -19,15 +19,17 @@ kubectl get pods        # ready to use; default namespace u-<you>
 ```
 
 ## Your home
-Every Job sees your home at `/home/<you>`, starts there, and runs as you.
-Same files as over SSH, live. Nothing to upload or copy. Write output to home and it stays.
-HF token for gated models: already in secret `hf-token`.
+The examples mount your home (`hostPath: /home/<you>`) and start there: same files as over SSH, nothing to copy.
+Jobs run as the image's user (often root; you have sudo), so files they write may be root-owned.
+Cloned this repo yourself? Fill in your name first: `sed -i "s/<you>/$USER/g" $(grep -rl '<you>' ~/k8s-llm-example)`.
+LLM examples need your own Hugging Face token (accept the Llama 3.2 license on HF first), once:
+`kubectl create secret generic hf-token --from-literal=token=hf_xxx`
 
 ## Queue
 ```bash
 kubectl get workloads                   # yours; ADMITTED=True = got the card
-kubectl get clusterqueue n150           # pending / admitted counts (n150 and MI210 share this queue)
-kubectl get --raw /apis/visibility.kueue.x-k8s.io/v1beta2/clusterqueues/n150/pendingworkloads   # everyone's order
+kubectl get clusterqueue default        # pending / admitted counts (n150 and MI210 share this queue)
+kubectl get --raw /apis/visibility.kueue.x-k8s.io/v1beta2/clusterqueues/default/pendingworkloads   # everyone's order
 ```
 
 ## Metrics
@@ -40,10 +42,9 @@ kubectl top pods -A
 Your own exporter: add a ServiceMonitor or PodMonitor in any namespace; Prometheus picks it up. Example: `exporter/`.
 
 ## Rules
-- Everything in `u-<you>` is queued by default (Jobs, Pods, Deployments). Jobs get your home, run as you, and no retries.
+- Everything in `u-<you>` is queued by default (Jobs, Pods, Deployments). Jobs get no retries.
 - No time limit: delete your Job when done, others wait for the card. Auto-stop: label `kueue.x-k8s.io/max-exec-time-seconds: "3600"`.
 - You can create your own claims/templates, namespaces, operators, CRDs. Other namespaces aren't queued: if you grab a card there, tell the others.
-- Image needs its own user (like the n150 vLLM image)? Label the Job `n150/home: "false"`: no home mount.
 - No IOMMU: code holding a card can read all VM memory. Keep no secrets here.
 
 ## kubectl cheatsheet

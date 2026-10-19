@@ -12,13 +12,13 @@ kubectl logs -f job/n150-job
 ## Interactive shell
 ```bash
 kubectl replace --force -f k8s-llm-example/n150/shell.yaml
-kubectl exec -it job/n150-shell -- bash   # prompt says "I have no name!": harmless
+kubectl exec -it job/n150-shell -- bash
 kubectl delete job n150-shell             # free the card
 ```
 
 ## LLM (Llama-3.2-1B, vLLM, OpenAI API)
-Settings (context length, batch) live in `llama-3.2-1b-n150.json`. The vLLM image can't read your home, so load it
-into configmap `llm-spec` (again after every edit).
+Settings (context length, batch) live in `llama-3.2-1b-n150.json`. Load it into configmap `llm-spec`
+(again after every edit).
 ```bash
 kubectl create configmap llm-spec --from-file=spec.json=k8s-llm-example/n150/llama-3.2-1b-n150.json --dry-run=client -o yaml | kubectl apply -f -
 kubectl replace --force -f k8s-llm-example/n150/llm.yaml

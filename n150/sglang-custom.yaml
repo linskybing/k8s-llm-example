@@ -19,14 +19,12 @@ spec:
       containers:
         - name: sglang
           image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.11.1-84b4c53-222ee06
+          securityContext: {runAsUser: 0}   # the image's own user (uid 15863) can't read your home
+          workingDir: /home/<you>        # your home, mounted below (hostPath): same files as over SSH
           command: [bash, -c]
           args:
             - |
               set -e
-              # runs as you, not the image user: USER because your uid isn't in the image's /etc/passwd (torch calls
-              # getpass.getuser()); tt-metal logs + kernel cache go to your home
-              export USER=${HOME##*/} TT_METAL_LOGS_PATH=$HOME/tt-cache/logs
-              mkdir -p $TT_METAL_LOGS_PATH
               source $PYTHON_ENV_DIR/bin/activate
               # first run (~1 min): build SGLang's CPU kernels (sgl-kernel) against the image's torch, + torchao, into ~/venvs/sglang-tt
               [ -e ~/venvs/sglang-tt/sgl_kernel ] || (pip install -q --target ~/venvs/sglang-tt-build scikit-build-core cmake ninja \
@@ -47,8 +45,13 @@ spec:
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef: {name: hf-token, key: token}
+            - {name: HOME, value: /home/<you>}
           ports:
             - {name: metrics, containerPort: 8000}
           readinessProbe:
             httpGet: {path: /health, port: 8000}
             timeoutSeconds: 5          # SGLang's /health runs a 1-token generation (~1 s on the n150)
+          volumeMounts:
+            - {name: home, mountPath: /home/<you>}
+      volumes:
+        - {name: home, hostPath: {path: /home/<you>, type: Directory}}

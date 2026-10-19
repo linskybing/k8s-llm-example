@@ -15,4 +15,11 @@ spec:
       containers:
         - name: shell
           image: ghcr.io/tenstorrent/tt-metal/tt-metalium-ubuntu-22.04-release-amd64:v0.79.0
+          workingDir: /home/<you>        # your home, mounted below (hostPath): same files as over SSH
           command: [sleep, infinity]
+          env:
+            - {name: HOME, value: /home/<you>}
+          volumeMounts:
+            - {name: home, mountPath: /home/<you>}
+      volumes:
+        - {name: home, hostPath: {path: /home/<you>, type: Directory}}

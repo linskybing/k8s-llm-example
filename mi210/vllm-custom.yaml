@@ -18,6 +18,7 @@ spec:
       containers:
         - name: vllm
           image: vllm/vllm-openai-rocm:v0.32.0   # ~/vllm must be checked out at the same version (v0.32.0)
+          workingDir: /home/<you>        # your home, mounted below (hostPath): same files as over SSH
           command: [bash, -c]
           args:
             - |
@@ -32,9 +33,14 @@ spec:
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef: {name: hf-token, key: token}
+            - {name: HOME, value: /home/<you>}
           ports:
             - {name: metrics, containerPort: 8000}
           readinessProbe:
             httpGet: {path: /health, port: 8000}
           resources:
             claims: [{name: gpu}]
+          volumeMounts:
+            - {name: home, mountPath: /home/<you>}
+      volumes:
+        - {name: home, hostPath: {path: /home/<you>, type: Directory}}
