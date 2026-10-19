@@ -9,6 +9,7 @@ kubectl replace --force -f k8s-llm-example/mi210/job.yaml && kubectl logs -f job
 ```
 More GPUs: `kubectl apply -f k8s-llm-example/mi210/mi210x4.yaml`, then `resourceClaimTemplateName: mi210x4`.
 Keep `resources.claims` in the container (as in `job.yaml`), or it holds the GPUs but sees none.
+n150 + MI210 in one Job: list both claims; it starts when both are free (never holds just one).
 
 ## LLM (Llama-3.2-1B, vLLM)
 Needs your `hf-token` secret (main README).

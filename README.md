@@ -28,7 +28,9 @@ read -s HF_TOKEN && kubectl create secret generic hf-token --from-literal=token=
 Run it again to change the token. Missing secret = LLM pod stuck in `CreateContainerConfigError`.
 
 ## Queue and metrics
+One queue for both cards: a Job waits only for the cards it asks for.
 ```bash
+kubectl get clusterqueue default -o jsonpath='n150 in use: {.status.flavorsUsage[0].resources[?(@.name=="tenstorrent.com/chip")].total}/{.spec.resourceGroups[0].flavors[0].resources[?(@.name=="tenstorrent.com/chip")].nominalQuota}   MI210 in use: {.status.flavorsUsage[0].resources[?(@.name=="amd.com/gpu")].total}/{.spec.resourceGroups[0].flavors[0].resources[?(@.name=="amd.com/gpu")].nominalQuota}   waiting: {.status.pendingWorkloads}{"\n"}'
 kubectl get workloads            # ADMITTED=True: your Job got its card
 kubectl get --raw /apis/visibility.kueue.x-k8s.io/v1beta2/clusterqueues/default/pendingworkloads   # everyone waiting
 kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 &   # Prometheus at http://127.0.0.1:9090
