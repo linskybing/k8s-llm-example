@@ -12,7 +12,8 @@ kubectl delete job n150-shell
 
 ## LLM (Llama-3.2-1B, vLLM)
 Needs your `hf-token` secret (main README). Settings (context length, batch) are in `llama-3.2-1b-n150.json`;
-reload the configmap after each edit.
+reload the configmap after each edit. Missing configmap = pod stuck in `Init`/`ContainerCreating` (`describe`: FailedMount)
+and holds the n150 on every retry: delete the Job.
 ```bash
 kubectl create configmap llm-spec --from-file=spec.json=k8s-llm-example/n150/llama-3.2-1b-n150.json --dry-run=client -o yaml | kubectl apply -f -
 kubectl replace --force -f k8s-llm-example/n150/llm.yaml
