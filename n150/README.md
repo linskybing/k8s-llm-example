@@ -25,9 +25,14 @@ kubectl delete job n150-llm
 
 ## Your own vLLM / SGLang
 Python changes only; tt-metal comes from the image. Clone at the image's version once, then submit
-`vllm-custom.yaml` (needs `llm-spec`) or `sglang-custom.yaml` (experimental) as above. Resubmit after each edit.
+`vllm-custom.yaml` (needs `llm-spec`) or `sglang-custom.yaml` (experimental, needs `sglang-tt-site`) as above. Resubmit after each edit.
 ```bash
 git clone https://github.com/tenstorrent/vllm ~/tt-vllm && git -C ~/tt-vllm checkout 222ee06
 git clone -b v0.5.8.post1 https://github.com/sgl-project/sglang ~/tt-sglang
 git clone -b v0.11.1 https://github.com/tenstorrent/tt-inference-server ~/tt-inference-server   # SGLang's TT plugin
+```
+SGLang loads the TT plugin in every process through `sitecustomize.py` (configmap, once). Check that it runs on the n150:
+```bash
+kubectl create configmap sglang-tt-site --from-file=k8s-llm-example/n150/sitecustomize.py --dry-run=client -o yaml | kubectl apply -f -
+kubectl logs job/n150-sglang-custom | grep 'type='   # TTLlamaForCausalLM = n150; LlamaForCausalLM = CPU fallback (no configmap)
 ```

@@ -1,6 +1,11 @@
 # Your own SGLang (~/tt-sglang at v0.5.8.post1) on the n150 via Tenstorrent's tt-sglang-plugin (experimental), OpenAI API on port 8000.
 # Runs in the TT vLLM image (tt-metal + ttnn already there); SGLang and the plugin come from your home. See n150/README.md.
+# Needs configmap sglang-tt-site (n150/sitecustomize.py): SGLang starts its scheduler with "spawn", so the plugin must be loaded in
+# every process, else SGLang falls back to its own CPU model and never opens the n150.
+# --max-total-tokens 131072: SGLang's host token pool = the plugin's n150 KV cache; by default SGLang fills ~80% of free host memory.
+#   kubectl create configmap sglang-tt-site --from-file=k8s-llm-example/n150/sitecustomize.py --dry-run=client -o yaml | kubectl apply -f -
 #   kubectl replace --force -f k8s-llm-example/n150/sglang-custom.yaml
+#   kubectl logs job/n150-sglang-custom | grep 'type='      # TTLlamaForCausalLM: on the n150; LlamaForCausalLM: CPU fallback
 #   kubectl port-forward job/n150-sglang-custom 8000:8000 &   then python3 k8s-llm-example/chat.py "Hi"
 #   kubectl delete job n150-sglang-custom
 apiVersion: batch/v1
@@ -31,14 +36,9 @@ spec:
                 && cd ~/tt-sglang/sgl-kernel && cp pyproject_cpu.toml pyproject.toml \
                 && PATH=~/venvs/sglang-tt-build/bin:$PATH PYTHONPATH=~/venvs/sglang-tt-build:$PYTHONPATH MAX_JOBS=8 \
                    pip install -q --no-build-isolation --no-deps --target ~/venvs/sglang-tt . torchao==0.9.0)
-              export PYTHONPATH=$HOME/tt-sglang/python:$HOME/tt-inference-server/tt-sglang-plugin:$HOME/venvs/sglang-tt:$PYTHONPATH
-              # the image's tt-metal (84b4c53) calls Generator.decode_forward_text, renamed decode_forward (fixed upstream later);
-              # alias it, then start the plugin's server (it forks, so SGLang's workers keep the alias)
-              exec python -c 'import sys
-              from models.tt_transformers.tt.generator import Generator
-              Generator.decode_forward_text = Generator.decode_forward
-              from sglang_tt_plugin.scripts.launch_tt_server import main
-              main()' --model-path meta-llama/Llama-3.2-1B-Instruct --port 8000 --context-length 8192 --enable-metrics
+              export PYTHONPATH=/sglang-site:$HOME/tt-sglang/python:$HOME/tt-inference-server/tt-sglang-plugin:$HOME/venvs/sglang-tt:$PYTHONPATH
+              export SGLANG_TT_SITE=1   # /sglang-site/sitecustomize.py: decode alias + TT plugin in every process
+              exec python -c 'from sglang_tt_plugin.scripts.launch_tt_server import main; main()' --model-path meta-llama/Llama-3.2-1B-Instruct --port 8000 --context-length 8192 --enable-metrics --max-total-tokens 131072
           env:
             - name: TORCHDYNAMO_DISABLE      # no torch.compile on the CPU side (the image's triton can't), as the TT vLLM spec does
               value: "1"
@@ -53,5 +53,8 @@ spec:
             timeoutSeconds: 5          # SGLang's /health runs a 1-token generation (~1 s on the n150)
           volumeMounts:
             - {name: home, mountPath: /home/<you>}
+            - {name: site, mountPath: /sglang-site}
       volumes:
         - {name: home, hostPath: {path: /home/<you>, type: Directory}}
+        - name: site
+          configMap: {name: sglang-tt-site}
