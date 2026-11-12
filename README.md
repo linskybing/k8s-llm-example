@@ -20,7 +20,7 @@ Cloned this repo yourself? Fill in your name first: `sed -i "s/<you>/$USER/g" $(
 
 ## Hugging Face token (LLM examples, once)
 1. Create a read token: https://huggingface.co/settings/tokens
-2. Accept the Llama 3.2 license: https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
+2. Accept the Llama 3.2 license: https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct (8B on n150: also https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct)
 3. Store it in your namespace (not in shell history):
 ```bash
 read -s HF_TOKEN && kubectl create secret generic hf-token --from-literal=token=$HF_TOKEN --dry-run=client -o yaml | kubectl apply -f -

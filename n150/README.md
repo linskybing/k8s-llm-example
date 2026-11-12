@@ -23,6 +23,18 @@ python3 k8s-llm-example/chat.py "Hi"
 kubectl delete job n150-llm
 ```
 
+## LLM (Llama-3.1-8B, vLLM)
+Needs the Llama 3.1 license (main README). Context is 32k: Tenstorrent's 64k spec runs out of n150 DRAM.
+Weights stay in `~/.cache/tt-vllm-8b` (root-owned; `sudo rm -rf` it to free the disk).
+```bash
+kubectl create configmap llm-spec-8b --from-file=spec.json=k8s-llm-example/n150/llama-3.1-8b-n150.json --dry-run=client -o yaml | kubectl apply -f -
+kubectl replace --force -f k8s-llm-example/n150/llm-8b.yaml
+kubectl get pods                 # READY 1/1 after ~3 min (first run ~12)
+kubectl port-forward job/n150-llm-8b 8000:8000 &
+python3 k8s-llm-example/chat.py "Hi"
+kubectl delete job n150-llm-8b
+```
+
 ## Your own vLLM / SGLang
 Python changes only; tt-metal comes from the image. Clone at the image's version once, then submit
 `vllm-custom.yaml` (needs `llm-spec`) or `sglang-custom.yaml` (experimental, needs `sglang-tt-site`) as above. Resubmit after each edit.

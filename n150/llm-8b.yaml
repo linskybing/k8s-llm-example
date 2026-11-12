@@ -1,0 +1,57 @@
+# Llama-3.1-8B (vLLM, OpenAI API on port 8000). Settings: n150/llama-3.1-8b-n150.json via configmap llm-spec-8b (see README).
+#   kubectl create configmap llm-spec-8b --from-file=spec.json=k8s-llm-example/n150/llama-3.1-8b-n150.json --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl replace --force -f k8s-llm-example/n150/llm-8b.yaml  submit / resubmit
+#   kubectl get pods                                             READY 1/1 after ~3 min (first run ~12: download + conversion)
+#   kubectl port-forward job/n150-llm-8b 8000:8000 &
+#   python3 k8s-llm-example/chat.py "Hi"
+#   kubectl delete job n150-llm-8b                                release the n150 when done
+# Image 0.9.0, the one Tenstorrent pairs with 8B on n150 (not llm.yaml's 0.11.1): no weight download of its own, no CLI args.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: n150-llm-8b
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      resourceClaims:
+        - {name: n150, resourceClaimTemplateName: n150}
+      initContainers:
+        - name: weights                # skips files already in the cache
+          image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.9.0-25305db-6e67d2d
+          securityContext: {runAsUser: 0}
+          command: [bash, -c, 'source $PYTHON_ENV_DIR/bin/activate && python -c "import os; from huggingface_hub import snapshot_download as d; d(\"meta-llama/Llama-3.1-8B-Instruct\", local_dir=os.environ[\"MODEL_WEIGHTS_PATH\"], ignore_patterns=[\"original/*\"])"']
+          env:
+            - {name: MODEL_WEIGHTS_PATH, value: /home/container_app_user/cache_root/weights/Llama-3.1-8B-Instruct}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token, key: token}
+          volumeMounts:
+            - {name: cache, mountPath: /home/container_app_user/cache_root}
+      containers:
+        - name: vllm
+          image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.9.0-25305db-6e67d2d
+          securityContext: {runAsUser: 0}
+          # the image's Cmd without its gosu entrypoint (gosu drops the groups the n150 needs)
+          command: [bash, -c, 'source $PYTHON_ENV_DIR/bin/activate && python run_vllm_api_server.py']
+          env:
+            - {name: CACHE_ROOT, value: /home/container_app_user/cache_root}
+            - {name: MODEL_WEIGHTS_PATH, value: /home/container_app_user/cache_root/weights/Llama-3.1-8B-Instruct}
+            - {name: TT_CACHE_PATH, value: /home/container_app_user/cache_root/tt_metal_cache/cache_Llama-3.1-8B-Instruct/N150}
+            - {name: TT_MODEL_SPEC_JSON_PATH, value: /spec/spec.json}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token, key: token}
+          readinessProbe:
+            exec: {command: [test, -f, /tmp/ready]}   # written after trace capture
+          volumeMounts:
+            - {name: spec, mountPath: /spec}
+            - {name: cache, mountPath: /home/container_app_user/cache_root}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: spec
+          configMap: {name: llm-spec-8b}
+        - name: cache                  # weights + converted tensors, kept for the next run (root-owned)
+          hostPath: {path: /home/<you>/.cache/tt-vllm-8b, type: DirectoryOrCreate}
+        - name: shm                    # Tenstorrent runs this image with --shm-size 32G
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}

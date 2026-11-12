@@ -6,7 +6,7 @@ from openai import OpenAI
 
 client = OpenAI(base_url="http://localhost:8000/v1", api_key="none")
 r = client.chat.completions.create(
-    model="meta-llama/Llama-3.2-1B-Instruct",
+    model=client.models.list().data[0].id,  # whatever the server serves
     messages=[{"role": "user", "content": sys.argv[1] if len(sys.argv) > 1 else "Hi"}],
 )
 print(r.choices[0].message.content)
